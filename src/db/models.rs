@@ -30,6 +30,25 @@ impl Challenge {
         Ok(id)
     }
 
+    pub fn get_by_id(db: &Database, id: i64) -> Result<Option<Self>> {
+        let connection = db.connection.lock()?;
+
+        let mut statement =
+            connection.prepare("SELECT id, name, flag FROM challenges WHERE id = ?")?;
+
+        statement.bind(1, id).unwrap();
+
+        if let State::Row = statement.next()? {
+            Ok(Some(Self {
+                id: statement.read(0).unwrap(),
+                name: statement.read(1).unwrap(),
+                flag: statement.read(2).unwrap(),
+            }))
+        } else {
+            Ok(None)
+        }
+    }
+
     /// Fetches a single challenge row from the database keyed by flag.
     pub fn get_by_flag(db: &Database, flag: &str) -> Result<Option<Self>> {
         let connection = db.connection.lock()?;
