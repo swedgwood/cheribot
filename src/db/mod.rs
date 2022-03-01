@@ -1,6 +1,8 @@
 use std::sync::Mutex;
 
-use sqlite::{Connection, State};
+use sqlite::Connection;
+
+pub mod models;
 
 pub struct Database {
     connection: Mutex<Connection>,
@@ -30,10 +32,11 @@ impl Database {
     pub fn new() -> Self {
         let connection = sqlite::open(":memory:").unwrap();
 
+        // TODO: make flags and names unique
         connection
             .execute(
                 "
-                CREATE TABLE IF NOT EXISTS challenges (id INTEGER, name TEXT, flag TEXT);
+                CREATE TABLE IF NOT EXISTS challenges (id INTEGER PRIMARY KEY, name TEXT, flag TEXT);
                 ",
             )
             .unwrap();
@@ -49,35 +52,5 @@ impl Database {
         Database {
             connection: Mutex::new(connection),
         }
-    }
-
-    pub fn check_flag(&self, flag: &str) -> Result<Option<String>> {
-        let connection = self.connection.lock()?;
-
-        let mut statement = connection.prepare("SELECT name FROM challenges WHERE flag = ?")?;
-
-        statement.bind(1, flag).unwrap();
-
-        if let State::Row = statement.next()? {
-            let challenge_name = statement.read::<String>(0).unwrap();
-
-            Ok(Some(challenge_name))
-        } else {
-            Ok(None)
-        }
-    }
-
-    pub fn add_challenge(&self, name: &str, flag: &str) -> Result<()> {
-        let connection = self.connection.lock()?;
-
-        let mut statement =
-            connection.prepare("INSERT INTO challenges (name, flag) VALUES (?, ?)")?;
-
-        statement.bind(1, name).unwrap();
-        statement.bind(2, flag).unwrap();
-
-        while State::Done != statement.next()? {}
-
-        Ok(())
     }
 }

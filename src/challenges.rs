@@ -1,5 +1,4 @@
 use serenity::{
-    builder::CreateEmbed,
     client::Context,
     model::{
         id::RoleId,
@@ -13,7 +12,13 @@ use serenity::{
     prelude::Mentionable,
 };
 
-use crate::{db::Database, InteractionError, InteractionResult};
+use crate::{
+    db::{
+        models::{self, Challenge},
+        Database,
+    },
+    InteractionError, InteractionResult,
+};
 
 pub const ID_MODAL_FLAG_SUBMIT: &str = "modal_flag_submit";
 pub const ID_INPUT_MODAL_FLAG_SUBMIT: &str = "modal_flag_submit_input";
@@ -141,7 +146,7 @@ pub async fn modal_chal_add_response(
     {
         println!("Add chal: {:?}", (&name.value, &flag.value));
 
-        db.add_challenge(&name.value, &flag.value)?;
+        Challenge::create_challenge(db, &name.value, &flag.value)?;
 
         interaction
             .create_interaction_response(&ctx.http, |response| {
@@ -173,30 +178,44 @@ pub async fn modal_submit_flag_response(
     {
         println!("Flag submitted! {}", flag.value);
 
-        let mut embed = CreateEmbed::default();
-
-        match db.check_flag(&flag.value.to_string())? {
-            Some(x) => embed
-                .title("Flag correct!")
-                .colour((0, 255, 0))
-                .description(format!(
-                    "{} has scored the flag for challenge **{}**!",
-                    interaction.user.mention(),
-                    x
-                )),
-            None => embed
-                .title("Flag incorrect!")
-                .colour((255, 0, 0))
-                .description("Incorrect flag!".to_string()),
-        };
-
-        interaction
-            .create_interaction_response(ctx, |response| {
-                response
-                    .kind(InteractionResponseType::ChannelMessageWithSource)
-                    .interaction_response_data(|data| data.add_embed(embed))
-            })
-            .await?;
+        match models::Challenge::get_by_flag(db, &flag.value)? {
+            Some(challenge) => {
+                interaction
+                    .create_interaction_response(&ctx.http, |response| {
+                        response
+                            .kind(InteractionResponseType::ChannelMessageWithSource)
+                            .interaction_response_data(|data| {
+                                data.embed(|embed| {
+                                    embed
+                                        .title("Flag correct!")
+                                        .colour((0, 255, 0))
+                                        .description(format!(
+                                            "{} has scored the flag for challenge **{}**",
+                                            interaction.user.mention(),
+                                            challenge.name
+                                        ))
+                                })
+                            })
+                    })
+                    .await?
+            }
+            None => {
+                interaction
+                    .create_interaction_response(&ctx.http, |response| {
+                        response
+                            .kind(InteractionResponseType::ChannelMessageWithSource)
+                            .interaction_response_data(|data| {
+                                data.embed(|embed| {
+                                    embed
+                                        .title("Flag incorrect!")
+                                        .colour((255, 0, 0))
+                                        .description("Incorrect flag!")
+                                })
+                            })
+                    })
+                    .await?
+            }
+        }
 
         Ok(())
     } else {
