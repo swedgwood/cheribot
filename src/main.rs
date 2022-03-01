@@ -72,7 +72,9 @@ impl EventHandler for Handler {
                 if let Err(why) = match command.data.name.as_str() {
                     "submitflag" => challenges::cmd_submitflag(ctx, command).await,
                     "ping" => cmd_ping(ctx, command).await,
-                    "addchallenge" => challenges::cmd_addchallenge(ctx, command).await,
+                    "addchallenge" => {
+                        challenges::cmd_addchallenge(ctx, command, self.admin_role_id).await
+                    }
                     command_name => Err(InteractionError::Other(format!(
                         "Invalid command invoked: '{}'",
                         command_name

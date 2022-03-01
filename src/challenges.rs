@@ -63,7 +63,18 @@ pub async fn cmd_submitflag(
 pub async fn cmd_addchallenge(
     ctx: Context,
     command: ApplicationCommandInteraction,
+    admin_role_id: u64,
 ) -> InteractionResult {
+    if !command
+        .member
+        .as_ref()
+        .ok_or(InteractionError::Permissions)?
+        .roles
+        .contains(&RoleId(admin_role_id))
+    {
+        return Err(InteractionError::Permissions);
+    }
+
     command
         .create_interaction_response(&ctx.http, |response| {
             response
