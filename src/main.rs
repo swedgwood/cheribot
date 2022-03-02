@@ -3,11 +3,13 @@ use std::{collections::HashMap, env};
 use serenity::{
     async_trait,
     model::{
+        channel::ChannelType,
         gateway::Ready,
         id::GuildId,
         interactions::{
             application_command::{
-                ApplicationCommandInteraction, ApplicationCommandPermissionType,
+                ApplicationCommandInteraction, ApplicationCommandOptionType,
+                ApplicationCommandPermissionType,
             },
             Interaction, InteractionResponseType,
         },
@@ -19,6 +21,7 @@ mod db;
 use db::Database;
 
 mod challenges;
+mod messages;
 
 #[derive(Debug)]
 pub enum InteractionError {
@@ -75,6 +78,7 @@ impl EventHandler for Handler {
                     "addchallenge" => {
                         challenges::cmd_addchallenge(ctx, command, self.admin_role_id).await
                     }
+                    "botmsg" => messages::cmd_botmsg(ctx, command, self.admin_role_id).await,
                     command_name => Err(InteractionError::Other(format!(
                         "Invalid command invoked: '{}'",
                         command_name
@@ -96,6 +100,14 @@ impl EventHandler for Handler {
                             self.admin_role_id,
                         )
                         .await
+                    }
+                    messages::ID_MODAL_BOTMSG_SEND => {
+                        messages::modal_botmsg_send_response(ctx, interaction, self.admin_role_id)
+                            .await
+                    }
+                    messages::ID_MODAL_BOTMSG_EDIT => {
+                        messages::modal_botmsg_edit_response(ctx, interaction, self.admin_role_id)
+                            .await
                     }
                     modal_id => Err(InteractionError::Other(format!(
                         "Invalid id in modal submission: {:?}",
@@ -135,6 +147,50 @@ impl EventHandler for Handler {
                         .description("ROOT ONLY: add a challenge")
                         .default_permission(false)
                 })
+                .create_application_command(|command| {
+                    command
+                        .name("botmsg")
+                        .description("ROOT ONLY: Send and edit bot-authored messages")
+                        .default_permission(false)
+                        .create_option(|option| {
+                            option
+                                .kind(ApplicationCommandOptionType::SubCommand)
+                                .name("send")
+                                .description("ROOT ONLY: Send a bot-authored message")
+                                .create_sub_option(|option| {
+                                    option
+                                        .name("channel")
+                                        .description("The destination channel for the message")
+                                        .required(true)
+                                        .kind(ApplicationCommandOptionType::Channel)
+                                        .channel_types(&[ChannelType::Text])
+                                })
+                        })
+                        .create_option(|option| {
+                            option
+                                .kind(ApplicationCommandOptionType::SubCommand)
+                                .name("edit")
+                                .description("ROOT ONLY: Edit a bot-authored message")
+                                .create_sub_option(|option| {
+                                    option
+                                        .name("channel")
+                                        .description(
+                                            "The channel containing the bot-authored message",
+                                        )
+                                        .required(true)
+                                        .kind(ApplicationCommandOptionType::Channel)
+                                        .channel_types(&[ChannelType::Text])
+                                })
+                                .create_sub_option(|option| {
+                                    option
+                                        .name("msgid")
+                                        .description("The id of the bot-authored message to edit")
+                                        .required(true)
+                                        .kind(ApplicationCommandOptionType::String)
+                                        .channel_types(&[ChannelType::Text])
+                                })
+                        })
+                })
         })
         .await
         .unwrap();
@@ -145,16 +201,25 @@ impl EventHandler for Handler {
             .collect();
 
         let addchallenge_id = *command_id_map.get("addchallenge").unwrap();
+        let botmsg_id = *command_id_map.get("botmsg").unwrap();
 
         let _perms =
             GuildId::set_application_commands_permissions(&guild_id, &ctx.http, |permissions| {
-                permissions.create_application_command(|command| {
-                    command.id(addchallenge_id).create_permissions(|perm| {
-                        perm.kind(ApplicationCommandPermissionType::Role)
-                            .id(self.admin_role_id)
-                            .permission(true)
+                permissions
+                    .create_application_command(|command| {
+                        command.id(addchallenge_id).create_permissions(|perm| {
+                            perm.kind(ApplicationCommandPermissionType::Role)
+                                .id(self.admin_role_id)
+                                .permission(true)
+                        })
                     })
-                })
+                    .create_application_command(|command| {
+                        command.id(botmsg_id).create_permissions(|perm| {
+                            perm.kind(ApplicationCommandPermissionType::Role)
+                                .id(self.admin_role_id)
+                                .permission(true)
+                        })
+                    })
             })
             .await
             .unwrap();
