@@ -29,8 +29,8 @@ impl<T> From<std::sync::PoisonError<T>> for DbError {
 pub type Result<T> = std::result::Result<T, DbError>;
 
 impl Database {
-    pub fn new() -> Self {
-        let connection = sqlite::open(":memory:").unwrap();
+    pub fn new(db: &str) -> Self {
+        let connection = sqlite::open(db).unwrap();
 
         // TODO: make flags and names unique
         connection

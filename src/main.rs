@@ -252,9 +252,11 @@ async fn main() {
         .parse()
         .expect("ADMIN_ROLE_ID must be an integer.");
 
+    let sqlite_db_path = env::var("SQLITE_DB").expect("Expected SQLITE_DB in environment");
+
     let mut client = Client::builder(token)
         .event_handler(Handler {
-            db: Database::new(),
+            db: Database::new(&sqlite_db_path),
             admin_role_id,
         })
         .application_id(application_id)
