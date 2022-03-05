@@ -41,14 +41,6 @@ impl Database {
             )
             .unwrap();
 
-        connection
-            .execute(
-                "
-                INSERT INTO challenges VALUES (1, 'Hello, World!', 'cheri{helloworld}');
-                ",
-            )
-            .unwrap();
-
         Database {
             connection: Mutex::new(connection),
         }
